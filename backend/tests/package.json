@@ -1,0 +1,13 @@
+{
+  "name": "landowners-backend-tests",
+  "version": "1.0.0",
+  "description": "Backend tests for Land Owners OCR System",
+  "scripts": {
+    "test": "pytest tests/ -v --cov=. --cov-report=html",
+    "test:watch": "pytest-watch tests/",
+    "test:unit": "pytest tests/test_ocr.py -v",
+    "test:api": "pytest tests/test_api.py -v"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

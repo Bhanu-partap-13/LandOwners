@@ -1,0 +1,16 @@
+flask==3.0.0
+flask-cors==4.0.0
+opencv-python==4.8.1.78
+pytesseract==0.3.10
+torch==2.1.2
+transformers==4.36.2
+langdetect==1.0.9
+Pillow==10.1.0
+numpy==1.26.2
+pandas==2.1.4
+python-dotenv==1.0.0
+Werkzeug==3.0.1
+pdf2image==1.16.3
+requests==2.31.0
+gunicorn==21.2.0
+reportlab==4.0.7
