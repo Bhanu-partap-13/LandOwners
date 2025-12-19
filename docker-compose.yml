@@ -1,71 +1,22 @@
 version: '3.8'
 
 services:
-  # Backend Flask API
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: landowners-backend
+    build: ./backend
     ports:
       - "5000:5000"
-    environment:
-      - FLASK_ENV=production
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
-      - TESSERACT_PATH=/usr/bin/tesseract
-      - MAX_CONTENT_LENGTH=16777216
-      - ALLOWED_EXTENSIONS=png,jpg,jpeg,pdf
     volumes:
       - ./backend/uploads:/app/uploads
-      - ./backend/temp:/app/temp
       - ./backend/logs:/app/logs
-    networks:
-      - landowners-network
+      - ./backend/tessdata:/app/tessdata  # Map local tessdata if you want to use custom models
+    environment:
+      - TESSDATA_PREFIX=/app/tessdata
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
-  # Frontend React Application
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: landowners-frontend
+    build: ./frontend
     ports:
       - "80:80"
-    environment:
-      - VITE_API_URL=http://localhost:5000
     depends_on:
       - backend
-    networks:
-      - landowners-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-
-  # Optional: Redis for caching (future enhancement)
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: landowners-redis
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
-  #   networks:
-  #     - landowners-network
-  #   restart: unless-stopped
-
-networks:
-  landowners-network:
-    driver: bridge
-
-volumes:
-  redis-data:

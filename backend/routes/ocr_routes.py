@@ -1,12 +1,13 @@
 """
-OCR API routes
+OCR API routes - LIGHTWEIGHT VERSION
+Uses cloud APIs (Bhashini/Google Vision) instead of local Tesseract
 """
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 import logging
 from document.upload_handler import UploadHandler, PDFHandler
-from ocr.ocr_pipeline import OCRPipeline
+from ocr.lightweight_pipeline import OCRPipeline  # Using lightweight pipeline
 from common.response_formatter import ResponseFormatter, create_status_response, create_validation_error
 from config import Config
 
@@ -18,7 +19,7 @@ ocr_bp = Blueprint('ocr', __name__)
 # Initialize components
 upload_handler = UploadHandler()
 pdf_handler = PDFHandler()
-ocr_pipeline = OCRPipeline()
+ocr_pipeline = OCRPipeline()  # Now uses lightweight cloud-based pipeline
 
 @ocr_bp.route('/upload', methods=['POST'])
 def upload_file():

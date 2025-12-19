@@ -1,16 +1,87 @@
+# ===========================================
+# Land Record OCR - AI4BHARAT Requirements
+# ===========================================
+# Self-hosted translation using AI4Bharat models
+# No external APIs required - runs completely offline!
+#
+# Two installation modes:
+# 1. CPU-only (~1.2GB) - Works on any machine
+# 2. GPU (~2.5GB) - Faster, requires NVIDIA GPU
+
+# Core Web Framework
 flask==3.0.0
 flask-cors==4.0.0
-opencv-python==4.8.1.78
-pytesseract==0.3.10
-torch==2.1.2
-transformers==4.36.2
-langdetect==1.0.9
-Pillow==10.1.0
-numpy==1.26.2
-pandas==2.1.4
-python-dotenv==1.0.0
 Werkzeug==3.0.1
-pdf2image==1.16.3
-requests==2.31.0
 gunicorn==21.2.0
+
+# Image Processing
+Pillow==10.1.0
+opencv-python-headless==4.8.1.78
+
+# PDF Processing
+pymupdf==1.23.8  # PyMuPDF - no external dependencies needed
+
+# HTTP Requests
+requests==2.31.0
+
+# Utilities
+numpy==1.26.2
+python-dotenv==1.0.0
+
+# PDF Report Generation
 reportlab==4.0.7
+
+# Language Detection
+langdetect==1.0.9
+
+# ===========================================
+# AI4BHARAT - Self-Hosted Translation
+# ===========================================
+# IndicTrans2: Urdu/Hindi/22 Indic → English translation
+# IndicXlit: Script transliteration (optional)
+
+# PyTorch - Choose ONE based on your system:
+# -------------------------------------------
+# CPU-only (smaller, works everywhere):
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+
+# GPU version (faster, requires CUDA):
+# torch>=2.0.0  # Uncomment for GPU, comment CPU line above
+
+# Transformers (for loading HuggingFace models)
+transformers>=4.36.0
+
+# IndicTrans2 Toolkit (tokenizer & processor)
+# Install via: pip install git+https://github.com/VarunGumma/IndicTransToolkit.git
+IndicTransToolkit
+
+# IndicXlit Transliteration (optional, ~50MB)
+# pip install ai4bharat-transliteration
+
+# SentencePiece (required for tokenization)
+sentencepiece>=0.1.99
+
+# ===========================================
+# OPTIONAL DEPENDENCIES
+# ===========================================
+# For OCR (if not using PyMuPDF text extraction):
+# pytesseract==0.3.10  # Requires Tesseract-OCR installed
+
+# For Google Vision OCR (1000 free/month):
+# google-cloud-vision==3.4.0
+
+# ===========================================
+# INSTALLATION NOTES
+# ===========================================
+# 1. Install requirements:
+#    pip install -r requirements.txt
+#
+# 2. Install IndicTransToolkit:
+#    pip install git+https://github.com/VarunGumma/IndicTransToolkit.git
+#
+# 3. Models auto-download on first use (~800MB for translation)
+#
+# 4. Optional - Install IndicXlit for transliteration:
+#    pip install ai4bharat-transliteration
+# ===========================================

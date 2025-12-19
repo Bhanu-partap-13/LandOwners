@@ -39,17 +39,35 @@ def create_app(config_name='development'):
     def index():
         return jsonify({
             'message': 'Land Record OCR API',
-            'version': '1.0.0',
-            'status': 'running'
+            'version': '2.0.0',  # Lightweight version
+            'status': 'running',
+            'mode': 'lightweight'
         })
     
     @app.route('/api/health')
     def health():
+        from config import Config
         return jsonify({
             'status': 'healthy',
-            'service': 'OCR Backend',
-            'tesseract_configured': bool(app.config['TESSERACT_PATH'])
+            'service': 'OCR Backend (AI4Bharat)',
+            'mode': Config.OCR_MODE,
+            'ai4bharat_available': Config.is_ai4bharat_available(),
+            'ai4bharat_device': Config.get_ai4bharat_device(),
+            'google_vision_configured': Config.is_google_vision_configured(),
+            'backends_available': _get_available_backends()
         })
+    
+    def _get_available_backends():
+        """Check which OCR/translation backends are available"""
+        backends = []
+        from config import Config
+        if Config.is_ai4bharat_available():
+            backends.append('ai4bharat')
+        if Config.is_google_vision_configured():
+            backends.append('google_vision')
+        # Always include dictionary-based translation
+        backends.append('dictionary')
+        return backends
     
     return app
 

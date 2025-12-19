@@ -156,7 +156,7 @@ class OCRPipeline:
             
         except Exception as e:
             logger.error(f"Pipeline failed: {e}")
-            result_builder.add_error(f"Pipeline failed: {e}")
+            result_builder.add_error('pipeline', f"Pipeline failed: {e}")
             return result_builder.build(
                 raw_text='',
                 cleaned_text='',
@@ -235,7 +235,7 @@ class OCRPipeline:
             
         except Exception as e:
             logger.error(f"PDF processing failed: {e}")
-            result_builder.add_error(f"PDF processing failed: {e}")
+            result_builder.add_error('pdf_processing', f"PDF processing failed: {e}")
             return result_builder.build(
                 raw_text='',
                 cleaned_text='',

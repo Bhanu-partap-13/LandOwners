@@ -1,30 +1,24 @@
-# Backend Dockerfile
-FROM python:3.9-slim
-
-# Set working directory
-WORKDIR /app
+FROM python:3.11-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    tesseract-ocr-eng \
-    tesseract-ocr-hin \
-    tesseract-ocr-urd \
-    libgl1-mesa-glx \
+    libgl1 \
+    libglx-mesa0 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+WORKDIR /app
 
-# Install Python dependencies
+# Copy requirements first for caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy the rest of the application
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads temp logs
+RUN mkdir -p uploads logs temp cache
 
 # Set environment variables
 ENV FLASK_APP=app.py
@@ -34,9 +28,5 @@ ENV PYTHONUNBUFFERED=1
 # Expose port
 EXPOSE 5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/api/health')"
-
 # Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:create_app()"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:create_app()"]

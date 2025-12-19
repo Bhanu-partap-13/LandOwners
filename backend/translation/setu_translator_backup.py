@@ -1,36 +1,38 @@
 """
-Setu-Translate - Urdu to English Translation for Land Records
-FIXED VERSION - Uses lightweight dictionary-based translation
-No heavy dependencies (torch, transformers) needed!
+Setu-Translate Integration
+Precise Urdu to English translation for land records
+Uses AI4Bharat IndicTrans2 model
 """
 
-import logging
+import os
+import sys
 from typing import Dict, List, Optional
-from datetime import datetime
+import requests
+import json
+import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import our simple translator (handle both relative and absolute imports)
-SIMPLE_TRANSLATOR_AVAILABLE = False
+# Add Setu path
+SETU_TRANSLATE_PATH = os.path.join(os.path.dirname(__file__), '../../..', 'IndicLLMSuite', 'setu-translate')
+if os.path.exists(SETU_TRANSLATE_PATH):
+    sys.path.insert(0, SETU_TRANSLATE_PATH)
+
+# Import the real IndicTrans translator
 try:
-    from .simple_translator import SimpleTranslator, get_translator
-    SIMPLE_TRANSLATOR_AVAILABLE = True
+    from .indictrans_translator import IndicTransTranslator
+    INDICTRANS_AVAILABLE = True
 except ImportError:
-    try:
-        from simple_translator import SimpleTranslator, get_translator
-        SIMPLE_TRANSLATOR_AVAILABLE = True
-    except ImportError:
-        logger.warning("SimpleTranslator not available")
+    INDICTRANS_AVAILABLE = False
+    logger.warning("IndicTransTranslator not available, using fallback")
 
 
 class SetuTranslator:
     """
-    Translates Urdu text to English using dictionary-based approach.
-    Optimized for Jammu land records (Jamabandi, Fard, etc.)
-    
-    No heavy dependencies - works immediately without ML models!
+    Translates Urdu text to English using Setu-translate/IndicTrans2
+    Maintains document structure and formatting
     """
     
     def __init__(self):
@@ -40,20 +42,28 @@ class SetuTranslator:
             'en': 'English'
         }
         
-        # Initialize simple translator
-        if SIMPLE_TRANSLATOR_AVAILABLE:
-            self._translator = get_translator()
-            self.translator_available = True
-        else:
-            self._translator = None
-            self.translator_available = False
+        # Initialize IndicTrans translator
+        self._indictrans = None
+        self.setu_available = self._check_setu_availability()
         
-        logger.info(f"SetuTranslator initialized (translator available: {self.translator_available})")
+        logger.info(f"SetuTranslator initialized (IndicTrans available: {self.setu_available})")
+    
+    def _check_setu_availability(self) -> bool:
+        """Check if Setu-translate/IndicTrans2 is available"""
+        try:
+            if INDICTRANS_AVAILABLE:
+                # Try to create instance (lazy - won't load model yet)
+                self._indictrans = IndicTransTranslator(direction='indic-en')
+                return self._indictrans.is_available()
+            return False
+        except Exception as e:
+            logger.warning(f"Setu-translate not available: {e}")
+            return False
     
     def translate_text(self, text: str, source_lang: str = 'ur', 
                       target_lang: str = 'en') -> Dict:
         """
-        Translate text from Urdu to English
+        Translate text using Setu-translate
         
         Args:
             text: Text to translate
@@ -72,45 +82,142 @@ class SetuTranslator:
                 'method': 'none'
             }
         
-        # Use simple translator
-        if self.translator_available and self._translator:
-            result = self._translator.translate_text(text, source_lang, target_lang)
-            return result
+        # Try Setu-translate first
+        if self.setu_available:
+            result = self._translate_with_setu(text, source_lang, target_lang)
+            if result['success']:
+                return result['data']
         
-        # Ultimate fallback - basic word replacement
-        return self._basic_translate(text, source_lang, target_lang)
+        # Fallback to rule-based translation
+        return self._translate_fallback(text, source_lang, target_lang)
     
-    def _basic_translate(self, text: str, source_lang: str, target_lang: str) -> Dict:
+    def _translate_with_setu(self, text: str, source_lang: str, 
+                            target_lang: str) -> Dict:
         """
-        Basic fallback translation using minimal dictionary
+        Translate using IndicTrans2 model via setu-translate
         """
-        # Basic Urdu to English word mapping
-        basic_dict = {
+        try:
+            if self._indictrans is None:
+                return {'success': False, 'error': 'IndicTrans not initialized'}
+            
+            # Translate using the real model
+            # Note: translate_document expects a dict or string, but returns a dict
+            # We need to handle both cases
+            
+            # If text is simple string, use translate_text/translate_batch
+            if isinstance(text, str):
+                translated_text = self._indictrans.translate(
+                    text, 
+                    src_lang=source_lang, 
+                    tgt_lang=target_lang
+                )
+                
+                return {
+                    'success': True,
+                    'data': {
+                        'translated_text': translated_text,
+                        'source_language': source_lang,
+                        'target_language': target_lang,
+                        'confidence': 0.95,
+                        'method': 'indictrans2'
+                    }
+                }
+            
+            # If it's a document structure
+            result = self._indictrans.translate_document(
+                text, 
+                src_lang=source_lang, 
+                tgt_lang=target_lang,
+                preserve_structure=True
+            )
+            
+            return {
+                'success': True,
+                'data': {
+                    'translated_text': result.get('translated_text', ''),
+                    'source_language': result.get('source_language', source_lang),
+                    'target_language': result.get('target_language', target_lang),
+                    'confidence': result.get('confidence', 0.9),
+                    'method': 'indictrans2'
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Setu/IndicTrans translation error: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _translate_fallback(self, text: str, source_lang: str, 
+                           target_lang: str) -> Dict:
+        """
+        Fallback translation using rule-based approach
+        """
+        # Basic Urdu to English word mapping for land records
+        urdu_to_english = {
+            # Document terms
             'جمع بندی': 'Jamabandi',
             'موضع': 'Village',
             'تحصیل': 'Tehsil',
             'ضلع': 'District',
+            'سال': 'Year',
+            'نمبر': 'Number',
             'خسرہ': 'Khasra',
             'مالک': 'Owner',
+            'کاشتکار': 'Cultivator',
             'رقبہ': 'Area',
+            'ایکڑ': 'Acre',
             'کنال': 'Kanal',
             'مرلہ': 'Marla',
-            'جموں': 'Jammu',
-            'بشنال': 'Bishnah',
+            'فصل': 'Crop',
+            
+            # Places (as mentioned by user)
             'اتما پور': 'Atmapur',
+            'بشنال': 'Bishnah',
+            'جموں': 'Jammu',
+            
+            # Common words
+            'نام': 'Name',
+            'ولد': 'Son of',
+            'والد': 'Father',
+            'مکان': 'House',
+            'گاؤں': 'Village',
+            'محلہ': 'Mohalla',
+            'کل': 'Total',
+            'جنس': 'Type',
+            'زمین': 'Land',
+            'باغ': 'Orchard',
+            'عمارت': 'Building',
         }
         
+        # Translate by replacing known terms
         translated = text
-        for urdu, english in basic_dict.items():
+        for urdu, english in urdu_to_english.items():
             translated = translated.replace(urdu, english)
+        
+        # Clean up
+        translated = self._clean_translation(translated)
         
         return {
             'translated_text': translated,
             'source_language': source_lang,
             'target_language': target_lang,
-            'confidence': 0.6,
-            'method': 'basic-fallback'
+            'confidence': 0.7,  # Lower confidence for fallback
+            'method': 'rule-based-fallback'
         }
+    
+    def _clean_translation(self, text: str) -> str:
+        """Clean and format translated text"""
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+        
+        # Capitalize sentences
+        sentences = text.split('.')
+        sentences = [s.strip().capitalize() for s in sentences if s.strip()]
+        text = '. '.join(sentences)
+        
+        if text and not text.endswith('.'):
+            text += '.'
+        
+        return text
     
     def translate_document(self, ocr_result: Dict) -> Dict:
         """
@@ -204,6 +311,7 @@ class SetuTranslator:
             'other_details': ''
         }
         
+        # Simple extraction based on keywords
         lines = text.split('\n')
         
         for line in lines:
@@ -227,25 +335,8 @@ class SetuTranslator:
             if 'ضلع' in line:
                 fields['district'] = line
             
-            # Khasra
-            if 'خسرہ' in line:
-                fields['khasra_number'] = line
-            
-            # Area
-            if 'رقبہ' in line or 'کنال' in line or 'مرلہ' in line:
-                fields['area'] = line
-            
-            # Owner
-            if 'مالک' in line:
-                fields['owner_name'] = line
-            
-            # Crop
-            if 'فصل' in line:
-                fields['crop_type'] = line
-            
             # Store remaining as other details
-            keywords = ['جمع بندی', 'موضع', 'تحصیل', 'ضلع', 'خسرہ', 'رقبہ', 'مالک', 'فصل']
-            if not any(keyword in line for keyword in keywords):
+            if not any(keyword in line for keyword in ['جمع بندی', 'موضع', 'تحصیل', 'ضلع']):
                 fields['other_details'] += line + '\n'
         
         return fields
@@ -276,7 +367,7 @@ ADDITIONAL DETAILS
 {fields.get('other_details', 'N/A')}
 
 {'=' * 60}
-Translation Method: Setu-Translate (Dictionary-based)
+Translation Method: Setu-Translate
 Date: {self._get_current_date()}
         """.strip()
         
@@ -284,21 +375,8 @@ Date: {self._get_current_date()}
     
     def _get_current_date(self) -> str:
         """Get current date string"""
+        from datetime import datetime
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    def add_custom_terms(self, terms: Dict[str, str]):
-        """
-        Add custom translation terms
-        
-        Args:
-            terms: Dictionary of Urdu -> English mappings
-        """
-        if self._translator:
-            self._translator.add_custom_terms(terms)
-    
-    def get_supported_languages(self) -> Dict[str, str]:
-        """Get supported languages"""
-        return self.supported_languages.copy()
 
 
 class RAGTranslator:
@@ -353,6 +431,13 @@ class RAGTranslator:
     def search_and_translate(self, query: str, top_k: int = 5) -> Dict:
         """
         Search processed document and return relevant translations
+        
+        Args:
+            query: Search query in source language
+            top_k: Number of results
+            
+        Returns:
+            Dict with relevant translations
         """
         return self.rag_processor.get_translation_for_query(query, top_k)
     
@@ -369,27 +454,16 @@ def test_translator():
     """Test the translator"""
     translator = SetuTranslator()
     
-    # Test texts
-    test_texts = [
-        "جمع بندی موضع اتما پور تحصیل بشنال ضلع جموں",
-        "خسرہ نمبر ۱۲۳",
-        "مالک: محمد احمد ولد عبدالله",
-        "رقبہ: ۵ کنال ۱۰ مرلہ",
-    ]
+    # Test text
+    test_text = "جمع بندی موضع اتما پور تحصیل بشنال ضلع جموں"
     
-    print("=" * 60)
-    print("Testing Setu Translator (Dictionary-based)")
-    print("=" * 60)
+    print("Testing Setu Translator")
+    print(f"Input: {test_text}")
     
-    for text in test_texts:
-        result = translator.translate_text(text)
-        print(f"\nInput:      {text}")
-        print(f"Output:     {result['translated_text']}")
-        print(f"Method:     {result['method']}")
-        print(f"Confidence: {result['confidence']}")
-    
-    print("\n" + "=" * 60)
-    print("Test complete!")
+    result = translator.translate_text(test_text)
+    print(f"\nTranslated: {result['translated_text']}")
+    print(f"Method: {result['method']}")
+    print(f"Confidence: {result['confidence']}")
 
 
 if __name__ == '__main__':
